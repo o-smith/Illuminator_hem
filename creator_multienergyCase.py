@@ -7,6 +7,8 @@ import itertools
 import Models.Elenetwork.electricity_network_mosaik as en
 import Models.H2network.gas_network_mosaik as h2n
 import Models.Heatnetwork.heat_network_mosaik as qn
+import Models.Heatpump.heatpump.Heat_Pump_Model as Heat_Pump_Model
+import Models.Heatpump.heatpump.Heat_Pump_Des as Heat_Pump_Des
 from configuration.buildmodelset import *
 
 outputfile='Result/MultienergyCase/results.csv'
