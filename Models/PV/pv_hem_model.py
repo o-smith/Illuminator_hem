@@ -70,9 +70,6 @@ class PhotovoltaicSystem:
         base_height      -- is the distance between the ground and the lowest edge of the PV panel, in m
         height           -- is the height of the PV panel, in m
         width            -- is the width of the PV panel, in m
-        ext_cond         -- reference to ExternalConditions object
-        energy_supply_conn -- reference to EnergySupplyConnection object
-        simulation_time  -- reference to SimulationTime object
         inverter_peak_power -- Peak power in kW; represents the peak electrical power input to the inverter
         inverter_is_inside -- tells us that the inverter is considered inside the building
         overshading      -- TODO could add at a later date. Feed into solar module
@@ -88,17 +85,90 @@ class PhotovoltaicSystem:
         self.__inverter_peak_power = inverter_peak_power
         self.__inverter_is_inside = inverter_is_inside
 
+    def shading_factors_direct_diffuse(self):
+        """ return calculated shading factor """
+        return self.__external_conditions.shading_reduction_factor_direct_diffuse( \
+                self.__base_height, self.__projected_height, self.__width, \
+                self.__pitch, self.__orientation, self.__shading)
+
     def inverter_is_inside(self):
         """ Return whether this unit is considered inside the building or not """
         return self.__inverter_is_inside
 
-    def connect(self, ext_cond, energy_supply_conn, simulation_time):
+    def connect(self, air_temperatures, wind_speeds, wind_directions, diffuse_horizontal_radiation,
+                direct_beam_radiation, 
+                solar_reflectivity_of_ground):
         """ Produce electrical energy (in kWh) from the PV system
             according to BS EN 15316-4-3:2017 """
+        
+        simtime = SimulationTime(0, 1, 1)
+        proj_dict = {
+            "ExternalConditions": {
+                "air_temperatures": air_temperatures,
+                "wind_speeds": wind_speeds,
+                "wind_directions": wind_directions,
+                "diffuse_horizontal_radiation": diffuse_horizontal_radiation,
+                "direct_beam_radiation": direct_beam_radiation,
+                "solar_reflectivity_of_ground": solar_reflectivity_of_ground,
+                "latitude": 51.42,
+                "longitude": -0.75,
+                "timezone": 0,
+                "start_day": 0,
+                "end_day": 0,
+                "time_series_step": 1,
+                "january_first": 1,
+                "daylight_savings": "not applicable",
+                "leap_day_included": False,
+                "direct_beam_conversion_needed": False,
+                "shading_segments":[{"number": 1, "start": 180, "end": 135},
+                                    {"number": 2, "start": 135, "end": 90,
+                                     "shading": [
+                                         {"type": "overhang", "height": 2.2, "distance": 6}
+                                         ]
+                                     },
+                                    {"number": 3, "start": 90, "end": 45},
+                                    {"number": 4, "start": 45, "end": 0, 
+                                     "shading": [
+                                         {"type": "obstacle", "height": 40, "distance": 4},
+                                         {"type": "overhang", "height": 3, "distance": 7}
+                                         ]
+                                     },
+                                    {"number": 5, "start": 0, "end": -45,
+                                     "shading": [
+                                         {"type": "obstacle", "height": 3, "distance": 8},
+                                         ]
+                                     },
+                                    {"number": 6, "start": -45, "end": -90},
+                                    {"number": 7, "start": -90, "end": -135},
+                                    {"number": 8, "start": -135, "end": -180}],
+            }
+        }
+        external_conditions = ExternalConditions(
+            simtime,
+            proj_dict['ExternalConditions']['air_temperatures'],
+            proj_dict['ExternalConditions']['wind_speeds'],
+            proj_dict['ExternalConditions']['wind_directions'],
+            proj_dict['ExternalConditions']['diffuse_horizontal_radiation'],
+            proj_dict['ExternalConditions']['direct_beam_radiation'],
+            proj_dict['ExternalConditions']['solar_reflectivity_of_ground'],
+            proj_dict['ExternalConditions']['latitude'],
+            proj_dict['ExternalConditions']['longitude'],
+            proj_dict['ExternalConditions']['timezone'],
+            proj_dict['ExternalConditions']['start_day'],
+            proj_dict['ExternalConditions']['end_day'],
+            proj_dict['ExternalConditions']["time_series_step"],
+            proj_dict['ExternalConditions']['january_first'],
+            proj_dict['ExternalConditions']['daylight_savings'],
+            proj_dict['ExternalConditions']['leap_day_included'],
+            proj_dict['ExternalConditions']['direct_beam_conversion_needed'],
+            proj_dict['ExternalConditions']['shading_segments']
+            )
+        energysupply = EnergySupply("electricity", simtime)
+        energysupplyconn = energysupply.connection("pv generation without shading")
 
-        self.__simulation_time = simulation_time
-        self.__external_conditions = ext_cond
-        self.__energy_supply_conn = energy_supply_conn
+        self.__simulation_time = simtime
+        self.__external_conditions = external_conditions
+        self.__energy_supply_conn = energysupplyconn
 
         #solar_irradiance in W/m2
         i_sol_dir, i_sol_dif, _ = self.__external_conditions.calculated_direct_diffuse_total_irradiance(
@@ -149,89 +219,12 @@ class PhotovoltaicSystem:
         # Add energy produced to the applicable energy supply connection (this will reduce demand)
         self.__energy_supply_conn.supply_energy(energy_produced)
 
-        energy_lost = energy_input - energy_produced
-
-        return energy_produced, energy_lost  # kWh
-
-    def shading_factors_direct_diffuse(self):
-        """ return calculated shading factor """
-        return self.__external_conditions.shading_reduction_factor_direct_diffuse( \
-                self.__base_height, self.__projected_height, self.__width, \
-                self.__pitch, self.__orientation, self.__shading)
+        # energy_lost = energy_input - energy_produced
+    
+        return {'pv_gen': energy_produced, 'total_irr': diffuse_horizontal_radiation + direct_beam_radiation}
 
 
 if __name__ == "__main__":
-
-    simtime = SimulationTime(0, 8, 1)
-
-    proj_dict = {
-            "ExternalConditions": {
-                "air_temperatures": [0.0, 2.5, 5.0, 7.5, 10.0, 12.5, 15.0, 20.0],
-                "wind_speeds": [3.9, 3.8, 3.9, 4.1, 3.8, 4.2, 4.3, 4.1],
-                "wind_directions": [220, 230, 240, 250, 260, 270, 270, 280],
-                "diffuse_horizontal_radiation": [11, 25, 42, 52, 60, 44, 28, 15],
-                "direct_beam_radiation": list(2.0*np.array([11, 25, 42, 52, 60, 44, 28, 15])),
-                "solar_reflectivity_of_ground": [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
-                "latitude": 51.42,
-                "longitude": -0.75,
-                "timezone": 0,
-                "start_day": 0,
-                "end_day": 0,
-                "time_series_step": 1,
-                "january_first": 1,
-                "daylight_savings": "not applicable",
-                "leap_day_included": False,
-                "direct_beam_conversion_needed": False,
-                "shading_segments":[{"number": 1, "start": 180, "end": 135},
-                                    {"number": 2, "start": 135, "end": 90,
-                                     "shading": [
-                                         {"type": "overhang", "height": 2.2, "distance": 6}
-                                         ]
-                                     },
-                                    {"number": 3, "start": 90, "end": 45},
-                                    {"number": 4, "start": 45, "end": 0, 
-                                     "shading": [
-                                         {"type": "obstacle", "height": 40, "distance": 4},
-                                         {"type": "overhang", "height": 3, "distance": 7}
-                                         ]
-                                     },
-                                    {"number": 5, "start": 0, "end": -45,
-                                     "shading": [
-                                         {"type": "obstacle", "height": 3, "distance": 8},
-                                         ]
-                                     },
-                                    {"number": 6, "start": -45, "end": -90},
-                                    {"number": 7, "start": -90, "end": -135},
-                                    {"number": 8, "start": -135, "end": -180}],
-            }
-        }
-
-
-    external_conditions = ExternalConditions(
-            simtime,
-            proj_dict['ExternalConditions']['air_temperatures'],
-            proj_dict['ExternalConditions']['wind_speeds'],
-            proj_dict['ExternalConditions']['wind_directions'],
-            proj_dict['ExternalConditions']['diffuse_horizontal_radiation'],
-            proj_dict['ExternalConditions']['direct_beam_radiation'],
-            proj_dict['ExternalConditions']['solar_reflectivity_of_ground'],
-            proj_dict['ExternalConditions']['latitude'],
-            proj_dict['ExternalConditions']['longitude'],
-            proj_dict['ExternalConditions']['timezone'],
-            proj_dict['ExternalConditions']['start_day'],
-            proj_dict['ExternalConditions']['end_day'],
-            proj_dict['ExternalConditions']["time_series_step"],
-            proj_dict['ExternalConditions']['january_first'],
-            proj_dict['ExternalConditions']['daylight_savings'],
-            proj_dict['ExternalConditions']['leap_day_included'],
-            proj_dict['ExternalConditions']['direct_beam_conversion_needed'],
-            proj_dict['ExternalConditions']['shading_segments']
-            )
-
-    
-    energysupply = EnergySupply("electricity", simtime)
-    energysupplyconn = energysupply.connection("pv generation without shading")
-
 
     pv_system = PhotovoltaicSystem(
                 2.5,                        # Peak power
@@ -241,13 +234,17 @@ if __name__ == "__main__":
                 10,                         # Base height
                 2,                          # Height
                 3,                          # Width
-                external_conditions,
-                energysupplyconn,
-                simtime,
                 [],                         # Shading
                 2.5,                        # Peak power
                 inverter_is_inside=False,
                 )
-    
-    result = pv_system.connect()
+
+    result = pv_system.connect(
+         0.0,
+         3.9,
+         220,
+         11,
+         11,
+         0.2
+    )
 

@@ -22,7 +22,15 @@ meta = {
                        'base_height', 'height', 'width', 'shading', 'inverter_peak_power',
                         'inverter_is_inside'],
             # and are attrs the specific outputs we want from the code? to connect with other models
-            'attrs': ['ext_cond', 'energy_supply_conn', 'simulation_time', 'pv_gen', 'total_irr'],
+            'attrs': ["air_temperatures",
+                        "wind_speeds",
+                        "wind_directions",
+                        "diffuse_horizontal_radiation",
+                        "direct_beam_radiation",
+                        "solar_reflectivity_of_ground",
+                        'pv_gen',
+                        'total_irr'
+                    ]
         },
     },
 }
@@ -64,7 +72,8 @@ class PvHemAdapter(mosaik_api.Simulator):
                 v.append(u)
 
             v_merged = list(itertools.chain(*v))
-            self._cache[eid] = self.entities[eid].connect(v_merged[0], v_merged[1], v_merged[2])
+            self._cache[eid] = self.entities[eid].connect(v_merged[0], v_merged[1], v_merged[2], v_merged[3],
+                                                          v_merged[4], v_merged[5])
 
     def get_data(self, _):
         data = {}
