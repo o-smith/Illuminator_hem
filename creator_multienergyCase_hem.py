@@ -7,8 +7,8 @@ import itertools
 import Models.Elenetwork.electricity_network_mosaik as en
 import Models.H2network.gas_network_mosaik as h2n
 import Models.Heatnetwork.heat_network_mosaik as qn
-import Models.Heatpump.heatpump.Heat_Pump_Model as Heat_Pump_Model
-import Models.Heatpump.heatpump.Heat_Pump_Des as Heat_Pump_Des
+#import Models.Heatpump.heatpump.Heat_Pump_Model as Heat_Pump_Model
+#import Models.Heatpump.heatpump.Heat_Pump_Des as Heat_Pump_Des
 from configuration.buildmodelset import *
 
 outputfile='Result/MultienergyCase/results.csv'
@@ -42,7 +42,7 @@ end = 1 * 24 * 3600  # last one interval is not computed
 
 WIND_on_DATA = 'Scenarios/winddata_NL.txt'  # same wind but different turbines
 WIND_off_DATA = 'Scenarios/winddata_NL.txt'
-Pv_DATA = 'Scenarios/pv_data_Rotterdam_NL-15min.txt'
+Pv_DATA = 'Scenarios/interpolated_external_conditions.txt'
 load_DATA = 'Scenarios/load_data.txt'
 battery_DATA = 'Scenarios/battery_data.txt'
 electrolyser_DATA = 'Scenarios/electrolyser_data.txt'
@@ -112,7 +112,7 @@ inremental_attributes()
 world = mosaik.World(sim_config, debug=True)
 
 Defined_models = pd.DataFrame()
-Defined_models['model'] = pd.Series(['HeatPump', 'Wind_on', 'Wind_off', 'PV', 'Load', 'Battery', 'Enetwork',
+Defined_models['model'] = pd.Series(['HeatPump', 'Wind_on', 'Wind_off', 'PV_HEM', 'Load', 'Battery', 'Enetwork',
                                      'Fuelcell', 'H2Storage', 'Electrolyser',
                                      'H2network', 'H2product',
                                      'H2demand_r', 'H2demand_fs', 'H2demand_ev', 'Ttrailers',
@@ -129,15 +129,25 @@ collector = world.start('Collector', start_date=START_DATE, results_show=RESULTS
 monitor = collector.Monitor()
 
 for model_i in Defined_models.iterrows():
-    if model_i[1]['model'] == 'PV':
+    if model_i[1]['model'] == 'PV_HEM':
         solardata = world.start('CSVB', sim_start=START_DATE, datafile=Pv_DATA)
-        pvsim = world.start('PV')
-        pv = pvsim.PVset.create(model_i[1]['number'], sim_start=START_DATE, panel_data=pv_panel_set,
-                                m_tilt=pv_set['m_tilt'], m_az=pv_set['m_az'], cap=pv_set['cap'],
-                                output_type=pv_set['output_type'])
+        pvsim = world.start('PV_HEM')
+        pv_hem = pvsim.PVset.create(model_i[1]['number'],
+                                    # sim_start=START_DATE, 
+                                    peak_power=2.5,                        # Peak power
+                                    ventilation_strategy="moderately_ventilated",    # Ventilation strat
+                                    pitch=30,                         # Pitch
+                                    orientation=0,                          # Orientation
+                                    base_height=10,                         # Base height
+                                    height=2,                          # Height
+                                    width=3,                          # Width
+                                    shading=[],                         # Shading
+                                    inverter_peak_power=2.5,                        # Peak power
+                                    inverter_is_inside=False
+                    )
         solarprofile_data = solardata.Solar_data.create(model_i[1]['number'])
         for i in range(model_i[1]['number']):
-            world.connect(solarprofile_data[i], pv[i], 'G_Gh', 'G_Dh', 'G_Bn', 'Ta', 'hs', 'FF', 'Az')
+            world.connect(solarprofile_data[i], pv_hem[i], 'air_temperatures', 'wind_speeds', 'wind_directions', 'diffuse_horizontal_radiation', 'direct_beam_radiation', 'solar_reflectivity_of_ground')
 
     elif model_i[1]['model'] == 'Wind_on':
         WSdata = world.start('CSVB', sim_start=START_DATE, datafile=WIND_on_DATA)

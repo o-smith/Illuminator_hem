@@ -8,9 +8,9 @@
   </row>
   <row>
     <index>1</index>
-    <model>PV</model>
+    <model>PV_HEM</model>
     <method>python</method>
-    <location>Models.PV.pv_mosaik:PvAdapter</location>
+    <location>Models.PV_HEM.pv_hem_mosaik:PvHemAdapter</location>
   </row>
   <row>
     <index>2</index>

@@ -24,7 +24,6 @@ class ExternalConditions:
             simulation_time,
             air_temps,
             wind_speeds,
-            wind_directions,
             diffuse_horizontal_radiation,
             direct_beam_radiation,
             solar_reflectivity_of_ground,
@@ -46,10 +45,6 @@ class ExternalConditions:
         simulation_time -- reference to SimulationTime object
         air_temps       -- list of external air temperatures, in deg C (one entry per hour)
         wind_speeds     -- list of wind speeds, in m/s (one entry per hour)
-        wind_directions -- list of wind directions in degrees where North=0, East=90, 
-                            South=180, West=270. Values range: 0 to 360.
-                            Wind direction is reported by the direction from which it originates.
-                            E.g, a southernly (180 degree) wind blows from the south to the north.
         diffuse_horizontal_radiation    -- list of diffuse horizontal radiation values, in W/m2 (one entry per hour)
         direct_beam_radiation           -- list of direct beam radiation values, in W/m2 (one entry per hour)
         solar_reflectivity_of_ground    -- list of ground reflectivity values, 0 to 1 (one entry per hour)
@@ -75,7 +70,6 @@ class ExternalConditions:
         self.__simulation_time  = simulation_time
         self.__air_temps        = air_temps
         self.__wind_speeds      = wind_speeds
-        self.__wind_directions  = wind_directions
         self.__solar_reflectivity_of_ground = solar_reflectivity_of_ground
         self.__latitude = latitude # practical  range -90 to +90
         self.__longitude = longitude # practical range -180 to +180
@@ -163,18 +157,15 @@ class ExternalConditions:
         simtime = deepcopy(self.__simulation_time)
         self.__direct_beam_radiation = [
             self.__init_direct_beam_radiation(
-                direct_beam_radiation[simtime.time_series_idx(self.__start_day, self.__time_series_step)],
-                self.__solar_altitude[simtime.current_hour()]
+                direct_beam_radiation,
+                self.__solar_altitude
                 )
             for _, _, _ in simtime
             ]
         # Calculate diffuse horizontal radiation for each timestep
         simtime = deepcopy(self.__simulation_time)
         self.__diffuse_horizontal_radiation = [
-            diffuse_horizontal_radiation[
-                simtime.time_series_idx(self.__start_day, self.__time_series_step)
-                ]
-            for _, _, _ in simtime
+            diffuse_horizontal_radiation
             ]
         # Calculate dimensionless clearness parameter for each timestep
         simtime = deepcopy(self.__simulation_time)
@@ -330,10 +321,6 @@ class ExternalConditions:
             == units.hours_per_day * units.days_per_year / self.__time_series_step
         return sum(self.__wind_speeds) / len(self.__wind_speeds)
 
-    def wind_direction(self):
-        """ Return the wind direction for the current timestep """
-        return self.__wind_directions[self.__simulation_time.time_series_idx(self.__start_day, self.__time_series_step)]
-
     def diffuse_horizontal_radiation(self):
         """ Return the diffuse_horizontal_radiation for the current timestep """
         return self.__diffuse_horizontal_radiation[self.__simulation_time.index()]
@@ -373,7 +360,7 @@ class ExternalConditions:
 
     def solar_reflectivity_of_ground(self):
         """ Return the solar_reflectivity_of_ground for the current timestep """
-        return self.__solar_reflectivity_of_ground[self.__simulation_time.time_series_idx(self.__start_day, self.__time_series_step)]
+        return self.__solar_reflectivity_of_ground
 
     def latitude(self):
         """ Return the latitude """
@@ -1109,14 +1096,8 @@ class ExternalConditions:
 
         current_hour = self.__simulation_time.current_hour()
         azimuth = self.__solar_azimuth_angle[current_hour]
-        
-        previous_segment_end = None
+
         for segment in self.__shading_segments:
-            if previous_segment_end != None and previous_segment_end != segment["start"]: 
-                sys.exit("Error: No gaps between segments allowed")
-            previous_segment_end = segment["end"]
-            if segment["end"] > segment["start"]:
-                sys.exit("Error: End orientation is less than the start orientation. Check shading inputs")
             if (azimuth < segment["start"] and azimuth > segment["end"]):
                 return segment
         #if not exited function yet then segment has not been found and there
@@ -1467,15 +1448,13 @@ class ExternalConditions:
             F_sh_dif = max(0.0, min(F_sh_dif_fins, F_sh_dif_overhangs))
             F_sh_ref = max(0.0, min(F_sh_ref_fins, F_sh_ref_overhangs))
 
-            if diffuse_irr_total == 0:
-                sys.exit('Error: Zero diffuse radiation with non-zero direct radiation.')
             Fdiff = ( F_sh_dif * (diffuse_irr_sky + diffuse_irr_hor)
                     + F_sh_ref * diffuse_irr_ref
                     ) \
                   / diffuse_irr_total
             Fdiff_list.append(Fdiff)
 
-        Fdiff = min(Fdiff_list)
+        Fdiff = max(Fdiff_list)
 
         return Fdiff
 
@@ -1513,33 +1492,6 @@ class ExternalConditions:
         if direct + diffuse == 0:
             return 0.0, 0.0
 
-        window_shading_expanded = []
-        if window_shading:
-            for shading_obj in window_shading:
-                if shading_obj["type"] == "reveal":
-                    window_shading_expanded.append(
-                        {
-                            "type": "overhang",
-                            "depth": shading_obj["depth"],
-                            "distance": shading_obj["distance"],
-                        }
-                    )
-                    window_shading_expanded.append(
-                        {
-                            "type": "sidefinleft",
-                            "depth": shading_obj["depth"],
-                            "distance": shading_obj["distance"]
-                        }
-                    )
-                    window_shading_expanded.append(
-                        {
-                            "type": "sidefinright",
-                            "depth": shading_obj["depth"],
-                            "distance": shading_obj["distance"]
-                        }
-                    )
-                else:
-                    window_shading_expanded.append(shading_obj)
         # first check if the surface is outside the solar beam
         # if so then direct shading is complete and we don't need to
         # calculate shading from objects
@@ -1561,14 +1513,14 @@ class ExternalConditions:
             Fdir = 1.0
         else:
             Fdir = self.direct_shading_reduction_factor \
-                    (base_height, height, width, orientation, window_shading_expanded)
+                    (base_height, height, width, orientation, window_shading)
 
         Fdiff = self.diffuse_shading_reduction_factor(
             diffuse_breakdown,
             tilt,
             height,
             width,
-            window_shading_expanded,
+            window_shading,
             )
 
         return Fdir, Fdiff

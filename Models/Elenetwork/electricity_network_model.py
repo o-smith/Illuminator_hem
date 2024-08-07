@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 
 class electricity_network_python:
@@ -13,7 +14,7 @@ class electricity_network_python:
         self.p_in = p_in
         self.p_out = p_out
         self.p_tot = sum(p_in) - sum(p_out) - self.p_loss
-        if self.p_tot > self.max_congestion:
+        if np.real(self.p_tot) > self.max_congestion:
             self.congestion = True
 
         re_params = {'p_tot': self.p_tot, 'p_in': self.p_in, 'p_out': self.p_out, 'p_loss': self.p_loss,

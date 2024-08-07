@@ -1,12 +1,12 @@
 import itertools
 import mosaik_api
-import Models.PV.pv_hem_model as PV_hem_model
-try:
-    import Models.PV.pv_model as PV_model
+import Models.PV_HEM.pv_hem_model as PV_hem_model
+"""try:
+    import Models.PV_HEM.pv_model as PV_model
 except ModuleNotFoundError:
     import pv_model as PV_model
 else:
-    import Models.PV.pv_model as PV_model
+    import Models.PV.pv_model as PV_model"""
 import pandas as pd
 import itertools
 from core.simulation_time import SimulationTime
@@ -43,11 +43,12 @@ class PvHemAdapter(mosaik_api.Simulator):
         self.mods = {}
         self._cache = {}  #we store the final outputs after calling the python model (#PV1) here.
 
-    def init(self, _, time_resolution):
+    def init(self, _, time_resolution = .15):
         self.time_resolution = time_resolution
         return self.meta
 
-    def create(self, num, model, sim_start, **model_params):
+    def create(self, num, model, sim_start=0, **model_params):
+        
         self.start = pd.to_datetime(sim_start)
         entities = []
         for i in range (num):
@@ -56,11 +57,13 @@ class PvHemAdapter(mosaik_api.Simulator):
             # we are creating an instance for PV and call the python file for that. **model_params refers to the
             # parameters we have mentioned above in the META. New instance will have those parameters.
             model_instance = PV_hem_model.PhotovoltaicSystem(**model_params)
+            
             self.entities[eid] = model_instance
             entities.append({'eid': eid, 'type': model})
         return entities
+    
 
-    def step(self, time, inputs, _):
+    def step(self, time, inputs, max_advance):
         # in this method, we call the python file at every data interval and perform the calculations.
         current_time = (self.start + pd.Timedelta(time * self.time_resolution,
                                                   unit='seconds'))  # timedelta represents a duration of time
@@ -79,6 +82,9 @@ class PvHemAdapter(mosaik_api.Simulator):
         data = {}
         for eid in self.entities.keys():
             data[eid] = {}
-            data[eid]["pv_gen"] = self._cache[eid][0]
+            # print("HERE IT IS:")
+            print(self._cache[eid])
+            data[eid]["pv_gen"] = self._cache[eid]["pv_gen"]
+            print(f'PV GENERATED = {self._cache[eid]["pv_gen"]}')
             data[eid]["total_irr"] = 10.0
         return data

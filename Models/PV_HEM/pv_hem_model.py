@@ -147,7 +147,6 @@ class PhotovoltaicSystem:
             simtime,
             proj_dict['ExternalConditions']['air_temperatures'],
             proj_dict['ExternalConditions']['wind_speeds'],
-            proj_dict['ExternalConditions']['wind_directions'],
             proj_dict['ExternalConditions']['diffuse_horizontal_radiation'],
             proj_dict['ExternalConditions']['direct_beam_radiation'],
             proj_dict['ExternalConditions']['solar_reflectivity_of_ground'],
@@ -247,4 +246,5 @@ if __name__ == "__main__":
          11,
          0.2
     )
+
 

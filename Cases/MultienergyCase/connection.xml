@@ -2,7 +2,7 @@
 <data>
   <row>
     <index>0</index>
-    <send>pv[0]</send>
+    <send>pv_hem[0]</send>
     <receive>enetwork[0]</receive>
     <messages>pv_gen</messages>
     <messager>p_in[0]</messager>

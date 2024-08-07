@@ -3,8 +3,13 @@
 """
 This module contains objects that represent photovoltaic systems.
 """
+import sys
+import os
+print("Python path before adding project directory:", sys.path)
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '/Users/defneatac/Documents/UCL_MSc/MSc Disso/Illuminator/Illuminator/core')))
+print("Python path after adding project directory:", sys.path)
 
-# Standard library imports
+# Standard library importscd c
 import math
 import numpy as np
 import core.units as units
@@ -161,6 +166,8 @@ class PhotovoltaicSystem:
 
 if __name__ == "__main__":
 
+    print("HEELO")
+
     simtime = SimulationTime(0, 8, 1)
 
     proj_dict = {
@@ -210,7 +217,7 @@ if __name__ == "__main__":
             simtime,
             proj_dict['ExternalConditions']['air_temperatures'],
             proj_dict['ExternalConditions']['wind_speeds'],
-            proj_dict['ExternalConditions']['wind_directions'],
+            #proj_dict['ExternalConditions']['wind_directions'],
             proj_dict['ExternalConditions']['diffuse_horizontal_radiation'],
             proj_dict['ExternalConditions']['direct_beam_radiation'],
             proj_dict['ExternalConditions']['solar_reflectivity_of_ground'],
@@ -249,5 +256,6 @@ if __name__ == "__main__":
                 )
     
     result = pv_system.produce_energy()
+    print (result)
 
     
